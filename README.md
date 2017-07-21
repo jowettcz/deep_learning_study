@@ -1,4 +1,4 @@
-#deep_learning_study
+# deep_learning_study
 
 这是一个学习项目，源代码来源于各种公开的网站和文档，并经过作者的调试进行了一定的重构和修改，希望对其他人有用。
 
