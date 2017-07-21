@@ -88,11 +88,11 @@ def max_pool_overlap_2x2(x):
                         strides=[1, 2, 2, 1], padding='SAME')
 
 
-def sequence_batch(images, labels, idx,_batch_size):
+def sequence_batch(images,labels,idx,_batch_size):
 
     # Use the random index to select random images and labels.
-    x_batch = images[idx:idx+_batch_size, :, :, :]
-    y_batch = labels[idx:idx+_batch_size, :]
+    x_batch = images[idx*_batch_size:(idx+1)*_batch_size, :, :, :]
+    y_batch = labels[idx*_batch_size:(idx+1)*_batch_size, :]
 
     return x_batch, y_batch
 
@@ -179,17 +179,16 @@ def run_training():
     loss = tf.reduce_mean(cross_entropy)
     tf.summary.scalar('loss',loss)
 
-    train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
-
     correct_prediction = tf.equal(tf.arg_max(y_cnn,1),tf.arg_max(y_,1))
-
     accuracy = tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
     tf.summary.scalar('accuracy', accuracy)
+
+    train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
 
     #define the saver,must after at least one variable has been defined
     saver = tf.train.Saver()
 
-    step = 0
+    start_step = 0
     #start the sess
     with tf.Session() as sess:
         try:
@@ -201,7 +200,7 @@ def run_training():
             # Try and load the data in the checkpoint.
             saver.restore(sess, save_path=last_chk_path)
 
-            step = last_chk_path.model_checkpoint_path.split('/')[-1].split('-')[-1]
+            start_step = last_chk_path.model_checkpoint_path.split('/')[-1].split('-')[-1]
 
             # If we get to this point, the checkpoint was successfully loaded.
             print("Restored checkpoint from:", last_chk_path)
@@ -219,19 +218,18 @@ def run_training():
 
         num_iterations = int(training_size/batch_size)
 
-        idx = 0
 
         # loss_value = tf.Variable(tf.float32,0)
 
-        for j in xrange(epoch):
+        for i in xrange(epoch):
             images,labels = shuffle(src_images,src_labels)
             test_images,test_labels = shuffle(src_test_images,src_test_labels)
 
-            for i in xrange(num_iterations):
-                step = step + j*1000+i
+            for j in xrange(num_iterations):
+                step = start_step + i*num_iterations + j
 
                 #begin to train now. First load the data
-                x_batch,y_batch = sequence_batch(images,labels,idx,batch_size)
+                x_batch,y_batch = sequence_batch(images,labels,j,batch_size)
 
                 _, loss_value,_summary_str =sess.run([train_step,loss,summary],
                     feed_dict={
@@ -272,37 +270,20 @@ def run_training():
                     }
 
                     train_accuracy = accuracy.eval(feed_dict=training_feed_dict)
-                    train_accuracy_dropout = accuracy.eval(feed_dict=training_feed_dict_dropout)
-                    print('step %d, training accuracy %g, dropout_nn accuracy %g' %
-                          (step, train_accuracy,train_accuracy_dropout))
+                    print('step %d, training accuracy %g' %(step, train_accuracy))
 
+                    #train_accuracy_dropout = accuracy.eval(feed_dict=training_feed_dict_dropout)
 
 
                     test_accuracy = accuracy.eval(feed_dict=test_feed_dict)
-                    test_accuracy_dropout = accuracy.eval(feed_dict=test_feed_dict_dropout)
-                    print('step %d, test accuracy %g, dropout_nn accuracy %g' %
-                          (step, test_accuracy,test_accuracy_dropout))
+                    print('step %d, test accuracy %g' %(step, test_accuracy))
+                    #test_accuracy_dropout = accuracy.eval(feed_dict=test_feed_dict_dropout)
 
-                    batch_accuracy = accuracy.eval(feed_dict={
-                                                   x: x_batch,
-                                                   y_: y_batch,
-                                                   keep_prob_local3: 1.0,
-                                                   keep_prob_local4: 1.0
-                    })
-
-                    batch_accuracy_dropout = accuracy.eval(feed_dict={
-                                                   x: x_batch,
-                                                   y_: y_batch,
-                                                   keep_prob_local3: 0.5,
-                                                   keep_prob_local4: 0.5
-                    })
-                    print('step %d, batch_accuracy %g,dropout accuracy %g ' %
-                          (step, batch_accuracy,batch_accuracy_dropout))
 
                     # large_summary_str = sess.run(summary,feed_dict=training_feed_dict)
                     # summary_writer.add_summary(large_summary_str, step,name='')
 
-                if (step % 300 == 0) or (i == num_iterations - 1):
+                if (j == num_iterations - 1):
                     # Save all variables of the TensorFlow graph to a
                     # checkpoint. Append the global_step counter
                     # to the filename so we save the last several checkpoints.
