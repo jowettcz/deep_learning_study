@@ -20,7 +20,7 @@ second_conv_feamap = 64
 
 fcn1_size = 1024
 
-epoch = 60
+epoch = 10
 batch_size = 50
 training_size = 50000
 
@@ -241,7 +241,7 @@ def run_training():
                 )
                 summary_writer.add_summary(_summary_str, step)
 
-                if i%100 == 0:
+                if j%100 == 0:
                     training_feed_dict = {
                         x: images,
                         y_: labels,
@@ -279,9 +279,6 @@ def run_training():
                     print('step %d, test accuracy %g' %(step, test_accuracy))
                     #test_accuracy_dropout = accuracy.eval(feed_dict=test_feed_dict_dropout)
 
-
-                    # large_summary_str = sess.run(summary,feed_dict=training_feed_dict)
-                    # summary_writer.add_summary(large_summary_str, step,name='')
 
                 if (j == num_iterations - 1):
                     # Save all variables of the TensorFlow graph to a
