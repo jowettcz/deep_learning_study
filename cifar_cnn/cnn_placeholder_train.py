@@ -183,7 +183,7 @@ def run_training():
     accuracy = tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
     tf.summary.scalar('accuracy', accuracy)
 
-    train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
+    train_step = tf.train.AdamOptimizer(learning_rate=1e-3).minimize(loss)
 
     #define the saver,must after at least one variable has been defined
     saver = tf.train.Saver()
@@ -239,7 +239,7 @@ def run_training():
                         keep_prob_local4: 0.5
                     }
                 )
-                summary_writer.add_summary(_summary_str, step)
+
 
                 if j%100 == 0:
                     training_feed_dict = {
@@ -269,6 +269,8 @@ def run_training():
                         keep_prob_local4: 0.5
                     }
 
+                    summary_writer.add_summary(_summary_str, step)
+                    
                     train_accuracy = accuracy.eval(feed_dict=training_feed_dict)
                     print('step %d, training accuracy %g' %(step, train_accuracy))
 

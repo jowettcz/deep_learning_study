@@ -39,21 +39,11 @@
       <file leaf-file-name="cnn_placeholder_train.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/cifar_cnn/cnn_placeholder_train.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-2882">
-              <caret line="90" column="36" lean-forward="false" selection-start-line="90" selection-start-column="33" selection-end-line="90" selection-end-column="36" />
+            <state relative-caret-position="234">
+              <caret line="272" column="20" lean-forward="false" selection-start-line="272" selection-start-column="20" selection-end-line="272" selection-end-column="20" />
               <folding>
                 <element signature="e#14#37#0" expanded="true" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="test.py" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/test.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="95">
-              <caret line="5" column="0" lean-forward="true" selection-start-line="5" selection-start-column="0" selection-end-line="5" selection-end-column="0" />
-              <folding />
             </state>
           </provider>
         </entry>
@@ -357,8 +347,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/cifar_cnn/cnn_placeholder_train.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2882">
-          <caret line="90" column="36" lean-forward="false" selection-start-line="90" selection-start-column="33" selection-end-line="90" selection-end-column="36" />
+        <state relative-caret-position="234">
+          <caret line="272" column="20" lean-forward="false" selection-start-line="272" selection-start-column="20" selection-end-line="272" selection-end-column="20" />
           <folding>
             <element signature="e#14#37#0" expanded="true" />
           </folding>
