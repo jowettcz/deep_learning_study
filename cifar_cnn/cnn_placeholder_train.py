@@ -20,53 +20,10 @@ second_conv_feamap = 64
 
 fcn1_size = 1024
 
-epoch = 10
+epoch = 20
 batch_size = 50
 training_size = 50000
-
-
-def _variable_on_cpu(name, shape, initializer):
-  """Helper to create a Variable stored on CPU memory.
-
-  Args:
-    name: name of the variable
-    shape: list of ints
-    initializer: initializer for Variable
-
-  Returns:
-    Variable Tensor
-  """
-  with tf.device('/cpu:0'):
-    dtype = tf.float32
-    var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
-  return var
-
-
-def _variable_with_weight_decay(name, shape, stddev, wd):
-  """Helper to create an initialized Variable with weight decay.
-
-  Note that the Variable is initialized with a truncated normal distribution.
-  A weight decay is added only if one is specified.
-
-  Args:
-    name: name of the variable
-    shape: list of ints
-    stddev: standard deviation of a truncated Gaussian
-    wd: add L2Loss weight decay multiplied by this float. If None, weight
-        decay is not added for this Variable.
-
-  Returns:
-    Variable Tensor
-  """
-  dtype = tf.float32
-  var = _variable_on_cpu(
-      name,
-      shape,
-      tf.truncated_normal_initializer(stddev=stddev, dtype=dtype))
-  if wd is not None:
-    weight_decay = tf.multiply(tf.nn.l2_loss(var), wd, name='weight_loss')
-    tf.add_to_collection('losses', weight_decay)
-  return var
+test_size = 10000
 
 def weight_variable(shape,name=None):
     """weight_variable generates a weight variable of a given shape."""
@@ -123,9 +80,8 @@ def inference(x):
     with tf.variable_scope('local3') as scope:
         # Move everything into depth so we can perform a single matrix multiply.
         reshape = tf.reshape(h_pool2, [-1, conv2_size*conv2_size*second_conv_feamap])
-        weights = _variable_with_weight_decay('weights3', shape=[conv2_size*conv2_size*second_conv_feamap, 384],
-                                              stddev=0.04, wd=0.004)
-        biases = _variable_on_cpu('biases3', [384], tf.constant_initializer(0.1))
+        weights = weight_variable(shape=[conv2_size*conv2_size*second_conv_feamap, 384],name='weights3',)
+        biases = bias_variable('biases3', [384])
         local3 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
 
         keep_prob_local3 = tf.placeholder(tf.float32)
@@ -133,9 +89,8 @@ def inference(x):
 
     #local4
     with tf.variable_scope('local4') as scope:
-        weights = _variable_with_weight_decay('weights4', shape=[384, 192],
-                                              stddev=0.04, wd=0.004)
-        biases = _variable_on_cpu('biases4', [192], tf.constant_initializer(0.1))
+        weights = weight_variable(shape=[384, 192],name='weights4')
+        biases = bias_variable('biases4', [192])
         local4 = tf.nn.relu(tf.matmul(h_pool2_drop, weights) + biases, name=scope.name)
 
         keep_prob_local4 = tf.placeholder(tf.float32)
@@ -146,10 +101,8 @@ def inference(x):
     # tf.nn.sparse_softmax_cross_entropy_with_logits accepts the unscaled logits
     # and performs the softmax internally for efficiency.
     with tf.variable_scope('softmax_linear') as scope:
-        weights = _variable_with_weight_decay('weights5', [192, 10],
-                                              stddev=1 / 192.0, wd=0.0)
-        biases = _variable_on_cpu('biases5', [10],
-                                  tf.constant_initializer(0.0))
+        weights = weight_variable(shape=[192, 10],name='weights5')
+        biases = bias_variable('biases5', [10])
         softmax_linear = tf.add(tf.matmul(local4_drop, weights), biases, name=scope.name)
 
     return softmax_linear,keep_prob_local3,keep_prob_local4
@@ -183,7 +136,7 @@ def run_training():
     accuracy = tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
     tf.summary.scalar('accuracy', accuracy)
 
-    train_step = tf.train.AdamOptimizer(learning_rate=1e-3).minimize(loss)
+    train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
 
     #define the saver,must after at least one variable has been defined
     saver = tf.train.Saver()
@@ -200,16 +153,19 @@ def run_training():
             # Try and load the data in the checkpoint.
             saver.restore(sess, save_path=last_chk_path)
 
-            start_step = last_chk_path.model_checkpoint_path.split('/')[-1].split('-')[-1]
+            start_step = int(last_chk_path.split('/')[-1].split('-')[-1])
 
             # If we get to this point, the checkpoint was successfully loaded.
-            print("Restored checkpoint from:", last_chk_path)
-        except:
+            print('Restored checkpoint from:%s, step:%d' %(last_chk_path,start_step))
+
+        except ValueError as e:
             # If the above failed for some reason, simply
             # initialize all the variables for the TensorFlow graph.
-            print("Failed to restore checkpoint. Initializing variables instead.")
+            print("Restore fails : {0} ".format(e))
+
             init = tf.global_variables_initializer()
             sess.run(init)
+
 
 
         #record the process
@@ -240,52 +196,56 @@ def run_training():
                     }
                 )
 
+                summary_writer.add_summary(_summary_str, step)
 
-                if j%100 == 0:
-                    training_feed_dict = {
-                        x: images,
-                        y_: labels,
-                        keep_prob_local3: 1.0,
-                        keep_prob_local4: 1.0
-                    }
+                # limited memory, accuracy is calculated with a batch of 5000, and count mean value
+                accuracy_batch = 5000
+                count_times = int(training_size/accuracy_batch)
+                train_accuracy = 0
 
-                    training_feed_dict_dropout = {
-                        x: images,
-                        y_: labels,
-                        keep_prob_local3: 0.5,
-                        keep_prob_local4: 0.5
-                    }
-
-                    test_feed_dict = {
-                        x: test_images,
-                        y_: test_labels,
-                        keep_prob_local3: 1.0,
-                        keep_prob_local4: 1.0
-                    }
-                    test_feed_dict_dropout = {
-                        x: test_images,
-                        y_: test_labels,
-                        keep_prob_local3: 0.5,
-                        keep_prob_local4: 0.5
-                    }
-
-                    summary_writer.add_summary(_summary_str, step)
-                    
-                    train_accuracy = accuracy.eval(feed_dict=training_feed_dict)
-                    print('step %d, training accuracy %g' %(step, train_accuracy))
-
-                    #train_accuracy_dropout = accuracy.eval(feed_dict=training_feed_dict_dropout)
-
-
-                    test_accuracy = accuracy.eval(feed_dict=test_feed_dict)
-                    print('step %d, test accuracy %g' %(step, test_accuracy))
-                    #test_accuracy_dropout = accuracy.eval(feed_dict=test_feed_dict_dropout)
 
 
                 if (j == num_iterations - 1):
+
+                    for k in xrange(count_times):
+                        accuracy_x_batch, accuracy_y_batch = sequence_batch(images, labels, k, accuracy_batch)
+
+                        training_feed_dict = {
+                            x: accuracy_x_batch,
+                            y_: accuracy_y_batch,
+                            keep_prob_local3: 1.0,
+                            keep_prob_local4: 1.0
+                        }
+
+                        train_accuracy = train_accuracy + accuracy.eval(feed_dict=training_feed_dict)
+                    #get mean value
+                    train_accuracy =train_accuracy/count_times
+                    print('step %d, training accuracy %g' %(step, train_accuracy))
+
+
+                    test_count_times = int(test_size / accuracy_batch)
+                    test_accuracy = 0
+
+                    for test_k in xrange(test_count_times):
+                        test_accuracy_x_batch, test_accuracy_y_batch \
+                            = sequence_batch(images, labels, test_k, accuracy_batch)
+
+                        test_feed_dict = {
+                            x: test_accuracy_x_batch,
+                            y_: test_accuracy_y_batch,
+                            keep_prob_local3: 1.0,
+                            keep_prob_local4: 1.0
+                        }
+
+
+                        test_accuracy = test_accuracy + accuracy.eval(feed_dict=test_feed_dict)
+                    test_accuracy = test_accuracy/test_count_times
+                    print('step %d, test accuracy %g' %(step, test_accuracy))
+                    
                     # Save all variables of the TensorFlow graph to a
                     # checkpoint. Append the global_step counter
                     # to the filename so we save the last several checkpoints.
+
                     checkpoint_file = os.path.join(log_dir, 'model.ckpt')
                     saver.save(sess,
                                save_path=checkpoint_file,
@@ -294,15 +254,15 @@ def run_training():
 
 
 
-            print('test accuracy in every epoch %g' % accuracy.eval(
-                feed_dict={
-                    x: test_images,
-                    y_: test_labels,
-                    keep_prob_local3: 1.0,
-                    keep_prob_local4: 1.0
-                }
-                )
-            )
+            # print('test accuracy in every epoch %g' % accuracy.eval(
+            #     feed_dict={
+            #         x: test_images,
+            #         y_: test_labels,
+            #         keep_prob_local3: 1.0,
+            #         keep_prob_local4: 1.0
+            #     }
+            #     )
+            # )
 
 def main(_):
     run_training()
