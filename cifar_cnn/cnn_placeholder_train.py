@@ -20,7 +20,7 @@ second_conv_feamap = 64
 
 fcn1_size = 1024
 
-epoch = 20
+epoch = 100
 batch_size = 50
 training_size = 50000
 test_size = 10000
@@ -81,7 +81,7 @@ def inference(x):
         # Move everything into depth so we can perform a single matrix multiply.
         reshape = tf.reshape(h_pool2, [-1, conv2_size*conv2_size*second_conv_feamap])
         weights = weight_variable(shape=[conv2_size*conv2_size*second_conv_feamap, 384],name='weights3',)
-        biases = bias_variable('biases3', [384])
+        biases = bias_variable([384],'biases3')
         local3 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
 
         keep_prob_local3 = tf.placeholder(tf.float32)
@@ -90,7 +90,7 @@ def inference(x):
     #local4
     with tf.variable_scope('local4') as scope:
         weights = weight_variable(shape=[384, 192],name='weights4')
-        biases = bias_variable('biases4', [192])
+        biases = bias_variable([192],'biases4')
         local4 = tf.nn.relu(tf.matmul(h_pool2_drop, weights) + biases, name=scope.name)
 
         keep_prob_local4 = tf.placeholder(tf.float32)
@@ -102,7 +102,7 @@ def inference(x):
     # and performs the softmax internally for efficiency.
     with tf.variable_scope('softmax_linear') as scope:
         weights = weight_variable(shape=[192, 10],name='weights5')
-        biases = bias_variable('biases5', [10])
+        biases = bias_variable([10],'biases5')
         softmax_linear = tf.add(tf.matmul(local4_drop, weights), biases, name=scope.name)
 
     return softmax_linear,keep_prob_local3,keep_prob_local4
@@ -144,6 +144,7 @@ def run_training():
     start_step = 0
     #start the sess
     with tf.Session() as sess:
+
         try:
             print("Trying to restore last checkpoint ...")
 
@@ -158,10 +159,10 @@ def run_training():
             # If we get to this point, the checkpoint was successfully loaded.
             print('Restored checkpoint from:%s, step:%d' %(last_chk_path,start_step))
 
-        except ValueError as e:
+        except Exception as e:
             # If the above failed for some reason, simply
             # initialize all the variables for the TensorFlow graph.
-            print("Restore fails : {0} ".format(e))
+            print("Restore fails : {0}, initialize...".format(e))
 
             init = tf.global_variables_initializer()
             sess.run(init)
@@ -179,10 +180,9 @@ def run_training():
 
         for i in xrange(epoch):
             images,labels = shuffle(src_images,src_labels)
-            test_images,test_labels = shuffle(src_test_images,src_test_labels)
 
             for j in xrange(num_iterations):
-                step = start_step + i*num_iterations + j
+                step = start_step + i*num_iterations + j +1
 
                 #begin to train now. First load the data
                 x_batch,y_batch = sequence_batch(images,labels,j,batch_size)
@@ -199,7 +199,7 @@ def run_training():
                 summary_writer.add_summary(_summary_str, step)
 
                 # limited memory, accuracy is calculated with a batch of 5000, and count mean value
-                accuracy_batch = 5000
+                accuracy_batch = 1000
                 count_times = int(training_size/accuracy_batch)
                 train_accuracy = 0
 
@@ -228,7 +228,7 @@ def run_training():
 
                     for test_k in xrange(test_count_times):
                         test_accuracy_x_batch, test_accuracy_y_batch \
-                            = sequence_batch(images, labels, test_k, accuracy_batch)
+                            = sequence_batch(src_test_images, src_test_labels, test_k, accuracy_batch)
 
                         test_feed_dict = {
                             x: test_accuracy_x_batch,
@@ -239,9 +239,10 @@ def run_training():
 
 
                         test_accuracy = test_accuracy + accuracy.eval(feed_dict=test_feed_dict)
+                    #calculate the total test accuracy
                     test_accuracy = test_accuracy/test_count_times
                     print('step %d, test accuracy %g' %(step, test_accuracy))
-                    
+
                     # Save all variables of the TensorFlow graph to a
                     # checkpoint. Append the global_step counter
                     # to the filename so we save the last several checkpoints.
