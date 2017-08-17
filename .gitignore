@@ -2,9 +2,9 @@
 __pycache__/
 *.py[cod]
 *$py.class
-cifar_cnn/cifar-10/
-cifar_cnn/log/
-cifar_cnn/testlog/
+cifar10/
+cnn4_cifar/log/
+vgg_cifar/log/
 mnist/MNIST_data
 # C extensions
 *.so

@@ -1,11 +1,9 @@
 #coding=utf-8
 import tensorflow as tf
-import numpy as np
-import cnn_data_loading
+from ..cifar10 import cnn_data_loading
 from six.moves import xrange
 import os
 from sklearn.utils import shuffle
-import re
 
 img_size = 32
 img_height = img_size

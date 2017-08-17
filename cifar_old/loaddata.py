@@ -14,13 +14,13 @@ def unpickle(file):
 cwd = os.getcwd()
 
 def get_training_data():
-    dict = unpickle(cwd + '/cifar-10/cifar-10-batches-py/data_batch_' + str(1))
+    dict = unpickle(cwd + '/cifar10/cifar10-batches-py/data_batch_' + str(1))
     images = dict[b'data']
     labels = dict[b'labels']
     filenames = dict[b'filenames']
 
     for i in range(2,5):
-        idict = unpickle(cwd + '/cifar-10/cifar-10-batches-py/data_batch_' + str(i));
+        idict = unpickle(cwd + '/cifar10/cifar10-batches-py/data_batch_' + str(i));
         dict = np.row_stack((dict,idict))
 
         iimages = idict[b'data']
@@ -35,12 +35,12 @@ def get_training_data():
     return {b'batch_label':'training batch,40000*3072',b'data':images,b'labels':labels,b'filenames':filenames}
 
 def get_validation_data():
-    dict = unpickle(cwd + '/cifar-10/cifar-10-batches-py/data_batch_' + str(5))
+    dict = unpickle(cwd + '/cifar10/cifar10-batches-py/data_batch_' + str(5))
     dict[b'batch_label']='validation data,size is 10000*3072'
     return dict
 
 def get_test_data():
-    dict = unpickle(cwd + '/cifar-10/cifar-10-batches-py/test_batch')
+    dict = unpickle(cwd + '/cifar10/cifar10-batches-py/test_batch')
 
     return dict
 
