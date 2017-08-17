@@ -1,10 +1,12 @@
 #coding=utf-8
 
 import tensorflow as tf
-from ..cifar10 import cnn_data_loading
+from cifar10 import cnn_data_loading
 from six.moves import xrange
 import os
 from sklearn.utils import shuffle
+
+src_size = 32
 
 img_size = 224
 img_height = img_size
@@ -165,7 +167,7 @@ def run_training():
         os.makedirs(log_dir)
 
     #defince the placeholder
-    x = tf.placeholder(tf.float32, shape=[None, img_height, img_width, img_channel], name='x')
+    x = tf.placeholder(tf.float32, shape=[None, src_size, src_size, img_channel], name='x')
     y_ = tf.placeholder(tf.float32, shape=[None, 10], name='y_')
     y_cls = tf.argmax(y_, dimension=1)
 
