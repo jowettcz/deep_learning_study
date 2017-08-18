@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
-cifar10/
+cifar10/cifar10-batches-py/
 cnn4_cifar/log/
 vgg_cifar/log/
 mnist/MNIST_data
