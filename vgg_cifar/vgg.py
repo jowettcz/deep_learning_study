@@ -242,7 +242,7 @@ def run_training():
                 summary_writer.add_summary(_summary_str, step)
 
                 # limited memory, accuracy is calculated with a batch of 5000, and count mean value
-                accuracy_batch = 1000
+                accuracy_batch = 200
                 count_times = int(training_size/accuracy_batch)
                 train_accuracy = 0
 
