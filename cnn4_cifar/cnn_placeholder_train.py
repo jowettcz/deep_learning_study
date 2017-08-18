@@ -1,6 +1,6 @@
 #coding=utf-8
 import tensorflow as tf
-from ..cifar10 import cnn_data_loading
+import cifar10
 from six.moves import xrange
 import os
 from sklearn.utils import shuffle
@@ -110,6 +110,8 @@ def run_training():
     #loading data
     src_images,classes,src_labels = cnn_data_loading.load_training_data()
     src_test_images,_,src_test_labels = cnn_data_loading.load_test_data()
+
+    src_images,src_labels =
 
     #set environment
     log_dir = os.getcwd() + '/log'

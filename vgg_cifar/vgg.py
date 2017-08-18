@@ -1,7 +1,7 @@
 #coding=utf-8
 
 import tensorflow as tf
-from cifar10 import cnn_data_loading
+import cnn_data_loading
 from six.moves import xrange
 import os
 from sklearn.utils import shuffle
@@ -149,7 +149,7 @@ def inference(x):
     with tf.variable_scope('fc3') as scope:
         weights = weight_variable(shape=[4096, 10],name='weights_fc3')
         biases = bias_variable([10],'biases_fc2')
-        softmax_linear = tf.add(tf.matmul(fc1, weights),biases)
+        softmax_linear = tf.add(tf.matmul(fc2, weights),biases)
 
     return softmax_linear
 
@@ -229,6 +229,7 @@ def run_training():
             for j in xrange(num_iterations):
                 step = start_step + i*num_iterations + j +1
 
+
                 #begin to train now. First load the data
                 x_batch,y_batch = sequence_batch(images,labels,j,batch_size)
 
@@ -247,7 +248,8 @@ def run_training():
                 train_accuracy = 0
 
 
-
+                if(j/100==0):
+                    print("current step:{0}".format(step))
                 if (j == num_iterations - 1):
 
                     for k in xrange(count_times):
