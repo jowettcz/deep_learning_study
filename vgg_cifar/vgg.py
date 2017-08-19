@@ -5,6 +5,8 @@ import cnn_data_loading
 from six.moves import xrange
 import os
 from sklearn.utils import shuffle
+from datetime import datetime
+import time
 
 src_size = 32
 
@@ -159,7 +161,6 @@ def run_training():
     src_images,classes,src_labels = cnn_data_loading.load_training_data()
     src_test_images,_,src_test_labels = cnn_data_loading.load_test_data()
 
-
     #set environment
     log_dir = os.getcwd() + '/log'
     print('log_dir is ' + log_dir)
@@ -186,7 +187,7 @@ def run_training():
     train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
 
     #define the saver,must after at least one variable has been defined
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=3)
 
     start_step = 0
     #start the sess
@@ -222,7 +223,7 @@ def run_training():
 
         num_iterations = int(training_size/batch_size)
 
-
+        start_time = time.time()
         for i in xrange(epoch):
             images,labels = shuffle(src_images,src_labels)
 
@@ -243,13 +244,28 @@ def run_training():
                 summary_writer.add_summary(_summary_str, step)
 
                 # limited memory, accuracy is calculated with a batch of 5000, and count mean value
-                accuracy_batch = 200
+                accuracy_batch = 50
                 count_times = int(training_size/accuracy_batch)
                 train_accuracy = 0
 
 
-                if(j/100==0):
-                    print("current step:{0}".format(step))
+                if step % 100 ==0 :
+                    current_time = time.time()
+                    duration = current_time - start_time
+                    start_time = current_time
+
+                    examples_per_sec = 100*batch_size/duration
+                    sec_per_batch = duration/100
+                    print("current step:%d, example per seconds:%f, seconds per batch50:%f" \
+                          %(step,examples_per_sec,sec_per_batch))
+
+                    checkpoint_file = os.path.join(log_dir, 'model.ckpt')
+                    saver.save(sess,
+                               save_path=checkpoint_file,
+                               global_step=step)
+                    print("Saved checkpoint " + str(step) + " steps.")
+
+
                 if (j == num_iterations - 1):
 
                     for k in xrange(count_times):
@@ -287,12 +303,6 @@ def run_training():
                     # Save all variables of the TensorFlow graph to a
                     # checkpoint. Append the global_step counter
                     # to the filename so we save the last several checkpoints.
-
-                    checkpoint_file = os.path.join(log_dir, 'model.ckpt')
-                    saver.save(sess,
-                               save_path=checkpoint_file,
-                               global_step=step)
-                    print("Saved checkpoint " + str(step) + " steps.")
 
 
 
