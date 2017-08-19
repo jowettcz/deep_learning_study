@@ -304,8 +304,6 @@ def run_training():
                     # checkpoint. Append the global_step counter
                     # to the filename so we save the last several checkpoints.
 
-
-
 def main(_):
     run_training()
 
