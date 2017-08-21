@@ -1,6 +1,7 @@
 #coding=utf-8
 
 import tensorflow as tf
+import tensorflow.contrib.slim as slim
 import cnn_data_loading
 from six.moves import xrange
 import os
@@ -9,10 +10,7 @@ from datetime import datetime
 import time
 
 src_size = 32
-
-img_size = 224
-img_height = img_size
-img_width = img_size
+img_size = 32
 
 img_channel = 3
 filter_size = 3
@@ -29,8 +27,11 @@ fcn1_size = 4096
 
 epoch = 100
 batch_size = 50
+L2_PENALTY = 0.01
+
 training_size = 50000
 test_size = 10000
+
 
 def weight_variable(shape,name=None):
     """weight_variable generates a weight variable of a given shape."""
@@ -62,12 +63,12 @@ def sequence_batch(images,labels,idx,_batch_size):
 
 def inference(x):
 
-    x_resized = tf.image.resize_images(x,[img_size,img_size])
+    # x_resized = tf.image.resize_images(x,[img_size,img_size])
 
     with tf.name_scope('conv1'):
         w_conv11 = weight_variable([filter_size, filter_size, img_channel, first_conv_featuremap])
         b_conv11 = bias_variable([first_conv_featuremap])
-        h_conv11 = tf.nn.relu(conv2d(x_resized, w_conv11) + b_conv11)
+        h_conv11 = tf.nn.relu(conv2d(x, w_conv11) + b_conv11)
 
         w_conv12 = weight_variable([filter_size, filter_size, first_conv_featuremap, first_conv_featuremap])
         b_conv12 = bias_variable([first_conv_featuremap])
@@ -134,26 +135,84 @@ def inference(x):
     # local3
     with tf.variable_scope('fc1') as scope:
         # Move everything into depth so we can perform a single matrix multiply.
-        reshape = tf.reshape(maxpool5, [-1, 7*7*512])
-        weights = weight_variable(shape=[7*7*512, 4096],name='weights_fc1',)
-        biases = bias_variable([4096],'biases_fc1')
-        fc1 = tf.nn.relu(tf.matmul(reshape, weights) + biases, name=scope.name)
+        reshape = tf.reshape(maxpool5, [-1, 1*1*512])
+        weights_fc1 = weight_variable(shape=[1*1*512, 4096],name='weights_fc1',)
+        biases_fc1 = bias_variable([4096],'biases_fc1')
+        fc1 = tf.nn.relu(tf.matmul(reshape, weights_fc1) + biases_fc1, name=scope.name)
 
+        keep_prob_fc1 = tf.placeholder(tf.float32)
+        fc1_drop = tf.nn.dropout(fc1, keep_prob_fc1)
     #local4
     with tf.variable_scope('fc2') as scope:
-        weights = weight_variable(shape=[4096, 4096],name='weights_fc2')
-        biases = bias_variable([4096],'biases_fc2')
-        fc2 = tf.nn.relu(tf.matmul(fc1, weights) + biases, name=scope.name)
+        weights_fc2 = weight_variable(shape=[4096, 4096],name='weights_fc2')
+        biases_fc2 = bias_variable([4096],'biases_fc2')
+        fc2 = tf.nn.relu(tf.matmul(fc1_drop, weights_fc2) + biases_fc2, name=scope.name)
 
-        # keep_prob_local4 = tf.placeholder(tf.float32)
-        # local4_drop = tf.nn.dropout(local4, keep_prob_local4)
+        keep_prob_fc2 = tf.placeholder(tf.float32)
+        fc2_drop = tf.nn.dropout(fc2, keep_prob_fc2)
     #local4
     with tf.variable_scope('fc3') as scope:
-        weights = weight_variable(shape=[4096, 10],name='weights_fc3')
-        biases = bias_variable([10],'biases_fc2')
-        softmax_linear = tf.add(tf.matmul(fc2, weights),biases)
+        weights_fc3 = weight_variable(shape=[4096, 10],name='weights_fc3')
+        biases_fc3 = bias_variable([10],'biases_fc2')
+        softmax_linear = tf.add(tf.matmul(fc2_drop, weights_fc3),biases_fc3)
 
-    return softmax_linear
+    #calculate the l2 regularization of all parameters
+    l2_loss = L2_PENALTY * ( tf.nn.l2_loss(w_conv11) + tf.nn.l2_loss(b_conv11) +
+                             tf.nn.l2_loss(w_conv12) + tf.nn.l2_loss(b_conv12) +
+                             tf.nn.l2_loss(w_conv21) + tf.nn.l2_loss(b_conv21) +
+                             tf.nn.l2_loss(w_conv22) + tf.nn.l2_loss(b_conv22) +
+                             tf.nn.l2_loss(w_conv31) + tf.nn.l2_loss(b_conv31) +
+                             tf.nn.l2_loss(w_conv32) + tf.nn.l2_loss(b_conv32) +
+                             tf.nn.l2_loss(w_conv33) + tf.nn.l2_loss(b_conv33) +
+                             tf.nn.l2_loss(w_conv41) + tf.nn.l2_loss(b_conv41) +
+                             tf.nn.l2_loss(w_conv42) + tf.nn.l2_loss(b_conv42) +
+                             tf.nn.l2_loss(w_conv43) + tf.nn.l2_loss(b_conv43) +
+                             tf.nn.l2_loss(w_conv51) + tf.nn.l2_loss(b_conv51) +
+                             tf.nn.l2_loss(w_conv52) + tf.nn.l2_loss(b_conv52) +
+                             tf.nn.l2_loss(w_conv53) + tf.nn.l2_loss(b_conv53) +
+                             tf.nn.l2_loss(weights_fc1) + tf.nn.l2_loss(biases_fc1)+
+                             tf.nn.l2_loss(weights_fc2) + tf.nn.l2_loss(biases_fc2) +
+                             tf.nn.l2_loss(weights_fc3) + tf.nn.l2_loss(biases_fc3))
+
+
+    return softmax_linear,keep_prob_fc1,keep_prob_fc2,l2_loss
+
+def slim_inference(x):
+    x_resized = tf.image.resize_images(x,[img_size,img_size])
+    with slim.arg_scope([slim.conv2d, slim.fully_connected],
+                        activation_fn=tf.nn.relu,
+                        weights_initializer=tf.truncated_normal_initializer(0.0, 0.01),
+                        weights_regularizer=slim.l2_regularizer(0.0005)):
+        net = slim.conv2d(x_resized, 64, [3, 3], scope='conv1_1')
+        net = slim.conv2d(net, 64, [3, 3], scope='conv1_2')
+        net = slim.max_pool2d(net, [2, 2], scope='pool1')
+
+        net = slim.conv2d(net, 128, [3, 3], scope='conv2_1')
+        net = slim.conv2d(net, 128, [3, 3], scope='conv2_2')
+        net = slim.max_pool2d(net, [2, 2], scope='pool2')
+
+        net = slim.conv2d(net, 256, [3, 3], scope='conv3_1')
+        net = slim.conv2d(net, 256, [3, 3], scope='conv3_2')
+        net = slim.conv2d(net, 256, [3, 3], scope='conv3_3')
+        net = slim.max_pool2d(net, [2, 2], scope='pool3')
+
+        net = slim.conv2d(net, 512, [3, 3], scope='conv4_1')
+        net = slim.conv2d(net, 512, [3, 3], scope='conv4_2')
+        net = slim.conv2d(net, 512, [3, 3], scope='conv4_3')
+        net = slim.max_pool2d(net, [2, 2], scope='pool4')
+
+        net = slim.conv2d(net, 512, [3, 3], scope='conv5_1')
+        net = slim.conv2d(net, 512, [3, 3], scope='conv5_2')
+        net = slim.conv2d(net, 512, [3, 3], scope='conv5_3')
+        net = slim.max_pool2d(net, [2, 2], scope='pool5')
+
+        net = tf.reshape(net, [-1, 2 * 2 * 512])
+        net = slim.fully_connected(net, 4096, scope='fc6')
+        net = slim.dropout(net, 0.5, scope='dropout6')
+        net = slim.fully_connected(net, 4096, scope='fc7')
+        net = slim.dropout(net, 0.5, scope='dropout7')
+        net = slim.fully_connected(net, 10, activation_fn=None, scope='fc8')
+    return net
 
 
 def run_training():
@@ -173,11 +232,13 @@ def run_training():
     y_cls = tf.argmax(y_, dimension=1)
 
     #build the graph
-    y_cnn = inference(x)
+    # y_cnn = slim_inference(x)
+    # loss = slim.losses.softmax_cross_entropy(y_cnn,y_)
 
-    #define the variable in the training
+    y_cnn,fc1_drop,fc2_drop,l2_loss = inference(x)
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=y_,logits=y_cnn)
     loss = tf.reduce_mean(cross_entropy)
+    loss = tf.add(loss,l2_loss,name='l2_loss')
     tf.summary.scalar('loss',loss)
 
     correct_prediction = tf.equal(tf.arg_max(y_cnn,1),tf.arg_max(y_,1))
@@ -187,7 +248,7 @@ def run_training():
     train_step = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(loss)
 
     #define the saver,must after at least one variable has been defined
-    saver = tf.train.Saver(max_to_keep=3)
+    saver = tf.train.Saver(max_to_keep=2)
 
     start_step = 0
     #start the sess
@@ -237,28 +298,30 @@ def run_training():
                 _, loss_value,_summary_str =sess.run([train_step,loss,summary],
                     feed_dict={
                         x: x_batch,
-                        y_: y_batch
+                        y_: y_batch,
+                        fc1_drop:0.5,
+                        fc2_drop:0.5
                     }
                 )
 
                 summary_writer.add_summary(_summary_str, step)
 
-                # limited memory, accuracy is calculated with a batch of 5000, and count mean value
-                accuracy_batch = 50
-                count_times = int(training_size/accuracy_batch)
-                train_accuracy = 0
-
-
-                if step % 100 ==0 :
+                steps_to_save = 500
+                if step % steps_to_save ==0 :
                     current_time = time.time()
                     duration = current_time - start_time
                     start_time = current_time
 
-                    examples_per_sec = 100*batch_size/duration
-                    sec_per_batch = duration/100
+                    examples_per_sec = steps_to_save*batch_size/duration
+                    sec_per_batch = duration/steps_to_save
                     print("current step:%d, example per seconds:%f, seconds per batch50:%f" \
                           %(step,examples_per_sec,sec_per_batch))
 
+                    rm_old_ckpfiles(log_dir)
+
+                    # Save all variables of the TensorFlow graph to a
+                    # checkpoint. Append the global_step counter
+                    # to the filename so we save the last several checkpoints.
                     checkpoint_file = os.path.join(log_dir, 'model.ckpt')
                     saver.save(sess,
                                save_path=checkpoint_file,
@@ -267,16 +330,24 @@ def run_training():
 
 
                 if (j == num_iterations - 1):
+                    # limited memory, accuracy is calculated with a batch of 5000, and count mean value
+                    accuracy_batch = 50
+                    count_times = int(training_size / accuracy_batch)
+                    train_accuracy = 0
+
 
                     for k in xrange(count_times):
                         accuracy_x_batch, accuracy_y_batch = sequence_batch(images, labels, k, accuracy_batch)
 
                         training_feed_dict = {
                             x: accuracy_x_batch,
-                            y_: accuracy_y_batch
+                            y_: accuracy_y_batch,
+                        fc1_drop:1.0,
+                        fc2_drop:1.0
                         }
 
                         train_accuracy = train_accuracy + accuracy.eval(feed_dict=training_feed_dict)
+
                     #get mean value
                     train_accuracy =train_accuracy/count_times
                     print('step %d, training accuracy %g' %(step, train_accuracy))
@@ -291,7 +362,9 @@ def run_training():
 
                         test_feed_dict = {
                             x: test_accuracy_x_batch,
-                            y_: test_accuracy_y_batch
+                            y_: test_accuracy_y_batch,
+                        fc1_drop:1.0,
+                        fc2_drop:1.0
                         }
 
 
@@ -300,9 +373,18 @@ def run_training():
                     test_accuracy = test_accuracy/test_count_times
                     print('step %d, test accuracy %g' %(step, test_accuracy))
 
-                    # Save all variables of the TensorFlow graph to a
-                    # checkpoint. Append the global_step counter
-                    # to the filename so we save the last several checkpoints.
+def rm_old_ckpfiles(log_dir):
+    try:
+        last_chk_path = tf.train.latest_checkpoint(checkpoint_dir=log_dir)
+
+        last_chk = last_chk_path.split('/')[-1]
+        old_chk_list = [f for f in os.listdir(log_dir) \
+                if f.startswith('model.ckpt') and not f.startswith(last_chk)]
+
+        for f in old_chk_list:
+            os.remove(os.path.join(log_dir, f))
+    except Exception as e:
+        print("Exception when remove old chk files: {0}".format(e))
 
 def main(_):
     run_training()

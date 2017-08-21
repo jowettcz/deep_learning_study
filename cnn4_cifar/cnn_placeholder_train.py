@@ -1,6 +1,6 @@
 #coding=utf-8
+import cnn_data_loading
 import tensorflow as tf
-import cifar10_gtf,cifar10_input
 from six.moves import xrange
 import os
 from sklearn.utils import shuffle
@@ -20,12 +20,8 @@ fcn1_size = 1024
 
 epoch = 100
 batch_size = 50
-accuracy_batch = 1000
-
 training_size = 50000
 test_size = 10000
-
-data_dir = '/tmp/cifar10_data/cifar-10-batches-bin'
 
 def weight_variable(shape,name=None):
     """weight_variable generates a weight variable of a given shape."""
@@ -47,13 +43,12 @@ def max_pool_overlap_2x2(x):
                         strides=[1, 2, 2, 1], padding='SAME')
 
 
-# def sequence_batch(images,labels,idx,_batch_size):
-#
-#     # Use the random index to select random images and labels.
-#     x_batch = images[idx*_batch_size:(idx+1)*_batch_size, :, :, :]
-#     y_batch = labels[idx*_batch_size:(idx+1)*_batch_size, :]
-#
-#     return x_batch, y_batch
+def sequence_batch(images,labels,idx,_batch_size):
+    # Use the random index to select random images and labels.
+    x_batch = images[idx*_batch_size:(idx+1)*_batch_size, :, :, :]
+    y_batch = labels[idx*_batch_size:(idx+1)*_batch_size, :]
+
+    return x_batch, y_batch
 
 def inference(x):
 
@@ -112,17 +107,8 @@ def inference(x):
 
 def run_training():
     #loading data
-
-    # src_images,classes,src_labels = cnn_data_loading.load_training_data()
-    # src_test_images,_,src_test_labels = cnn_data_loading.load_test_data()
-
-    cifar10_gtf.maybe_download_and_extract()
-    train_images,train_labels = cifar10_input.distorted_inputs(data_dir=data_dir,
-                                                            batch_size=batch_size)
-
-    test_images, test_labels = cifar10_input.inputs(eval_data=True,
-                                                    data_dir=data_dir,
-                                                    batch_size=batch_size)
+    src_images,classes,src_labels = cnn_data_loading.load_training_data()
+    src_test_images,_,src_test_labels = cnn_data_loading.load_test_data()
 
     #set environment
     log_dir = os.getcwd() + '/log'
@@ -190,12 +176,13 @@ def run_training():
         # loss_value = tf.Variable(tf.float32,0)
 
         for i in xrange(epoch):
+            images,labels = shuffle(src_images,src_labels)
 
             for j in xrange(num_iterations):
                 step = start_step + i*num_iterations + j +1
 
                 #begin to train now. First load the data
-                image_batch, label_batch = sess.run([train_images, train_labels])
+                image_batch, label_batch = sequence_batch(images, labels, j, batch_size)
 
                 _, loss_value,_summary_str =sess.run([train_step,loss,summary],
                     feed_dict={
@@ -209,19 +196,18 @@ def run_training():
                 summary_writer.add_summary(_summary_str, step)
 
                 # limited memory, accuracy is calculated with a batch of 5000, and count mean value
-
-                count_times = int(training_size/batch_size)
+                accuracy_batch = 1000
+                count_times = int(training_size/accuracy_batch)
                 train_accuracy = 0
-
-
 
                 if (j == num_iterations - 1):
 
                     for k in xrange(count_times):
+                        accuracy_x_batch, accuracy_y_batch = sequence_batch(images, labels, k, accuracy_batch)
 
                         training_feed_dict = {
-                            x: image_batch,
-                            y_: label_batch,
+                            x: accuracy_x_batch,
+                            y_: accuracy_y_batch,
                             keep_prob_local3: 1.0,
                             keep_prob_local4: 1.0
                         }
@@ -232,15 +218,16 @@ def run_training():
                     print('step %d, training accuracy %g' %(step, train_accuracy))
 
 
-                    # test_count_times = int(test_size / accuracy_batch)
+                    test_count_times = int(test_size / accuracy_batch)
                     test_accuracy = 0
 
-                    for test_k in xrange(count_times):
-                        test_images_batch,test_labels_batch = sess.run([test_images,test_labels])
+                    for test_k in xrange(test_count_times):
+                        test_accuracy_x_batch, test_accuracy_y_batch \
+                            = sequence_batch(src_test_images, src_test_labels, test_k, accuracy_batch)
 
                         test_feed_dict = {
-                            x: test_images_batch,
-                            y_: test_labels_batch,
+                            x: test_accuracy_x_batch,
+                            y_: test_accuracy_y_batch,
                             keep_prob_local3: 1.0,
                             keep_prob_local4: 1.0
                         }
@@ -248,7 +235,7 @@ def run_training():
 
                         test_accuracy = test_accuracy + accuracy.eval(feed_dict=test_feed_dict)
                     #calculate the total test accuracy
-                    test_accuracy = test_accuracy/count_times
+                    test_accuracy = test_accuracy/test_count_times
                     print('step %d, test accuracy %g' %(step, test_accuracy))
 
                     # Save all variables of the TensorFlow graph to a
@@ -261,6 +248,16 @@ def run_training():
                                global_step=step)
                     print("Saved checkpoint " + str(step) + " steps.")
 
+
+            # print('test accuracy in every epoch %g' % accuracy.eval(
+            #     feed_dict={
+            #         x: test_images,
+            #         y_: test_labels,
+            #         keep_prob_local3: 1.0,
+            #         keep_prob_local4: 1.0
+            #     }
+            #     )
+            # )
 
 def main(_):
     run_training()
