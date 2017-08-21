@@ -5,6 +5,8 @@ __pycache__/
 cifar10/cifar10-batches-py/
 cnn4_cifar/log/
 vgg_cifar/log/
+rnn/ptb/
+rnn/log/
 mnist/MNIST_data
 # C extensions
 *.so
